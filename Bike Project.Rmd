@@ -1,0 +1,198 @@
+---
+title: "Bike_Data_Project"
+author: "Anishaa Balakrishnan"
+date: "2024-01-29"
+output: html_document
+---
+## Case study: How does a bike-share navigate speedy success?
+### **INTRODUCTION**
+Welcome to the Cyclistic bike-share analysis case study! In this case study, you work for a fictional company, Cyclistic, along with some key team members.
+
+### **Scenario**
+You are a junior data analyst working on the marketing analyst team at Cyclistic, a bike-share company in Chicago. The director of marketing believes the company’s future success depends on maximizing the number of annual memberships. Therefore, your team wants to understand how casual riders and annual members use Cyclistic bikes differently. From these insights, your team will design a new marketing strategy to convert casual riders into annual members. But first, Cyclistic executives must approve your recommendations, so they must be backed up with compelling data insights and professional data visualizations.
+
+### **ASK**
+#### **Business Task:** 
+Understand how annual members and casual riders use cyclistic bikes differently.
+
+#### **Key Stakeholders:**
+The Director of Marketing and Manager Lily Moreno, Cyclistic marketing analytics team, Cyclistic executive team.
+
+### **PREPARE**
+
+#### 1. Data Source:
+
+The historical bike trip dataset from Cyclistic is stored in a compressed file named 'Divvy_Trips_2020_Q1,' encompassing information for the initial three months of the year 2020.
+
+#### 2. How the data is organized?
+
+The dataset is structured in tabular format, featuring columns such as ride_id, rideable_type, started_at, ended_at, start_station_name, start_station_id, end_station_name, end_station_id, start_lat, start_lng, end_lat, end_lng, and member_casual. It comprises approximately 426,886 observations, spanning across 13 variables.
+
+#### 3. Checking the credibility and data integrity
+
+Upon loading the dataset into the RStudio Cloud source editor, I meticulously examined its contents. I methodically tackled missing values and scrutinized for any anomalies. Rigorous testing was implemented to ensure the correct assignment of data types to each variable. Remarkably extensive, the dataset is sizable. To maintain data privacy, personally identifiable information of riders has been deliberately omitted. As a testament to its credibility, the dataset satisfies the ROCCC conditions.
+
+### **PROCESS**
+Uploading the dataset to the Source editor of Posit cloud:
+```{r}
+bike_data <- read.csv("/cloud/project/bike_data/Divvy_Trips_2020_Q1.csv")
+summary(bike_data)
+str(bike_data)
+
+```
+Installing and loading packages:
+```{r}
+install.packages("dplyr")
+library(dplyr)
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("janitor")
+library(janitor)
+```
+Filtering the data frame by removing rows with missing values:
+```{r}
+bike_data <- bike_data %>%
+  drop_na()
+```
+Deleting unwanted columns and renaming some columns for convenience
+```{r}
+bike_data_new <- subset(bike_data, select= -c(start_lat, start_lng, end_lat, end_lng))
+bike_data_new <- bike_data_new %>%
+  rename(start_time= started_at, end_time= ended_at, users= member_casual)
+```
+Converting the format of start_time and end_time columns to date-time format:
+```{r}
+bike_data_new <- bike_data_new %>%
+  mutate(
+    start_time = as.POSIXct(start_time, format = "%Y-%m-%d %H:%M:%S"),
+    end_time = as.POSIXct(end_time, format = "%Y-%m-%d %H:%M:%S")
+  )
+```
+Adding a new column called "ride_duration" to calculate the duration of each ride:
+```{r}
+bike_data_new <- bike_data_new %>%
+  mutate(bike_data_new, ride_duration= end_time-start_time)
+```
+Removing the rows with negative values from "ride_duration" and converting the values to hours:minutes:seconds format:
+```{r}
+bike_data_new <- subset(bike_data_new,ride_duration>=0)
+library(lubridate)
+bike_data_new$ride_length <- seconds_to_period(bike_data_new$ride_duration) %>% 
+  as.duration() %>% 
+  hms::hms()
+```
+Introduce a new column named 'day_of_week' to the dataset, assigning each ride's start day a numerical value corresponding to the days of the week. Specifically, set 1 for SUNDAY, 2 for MONDAY, and so forth.
+```{r}
+bike_data_new <- bike_data_new %>%
+  mutate(bike_data_new,day_of_week= wday(start_time, label=FALSE, week_start=1))
+str(bike_data_new)
+```
+
+### **ANALYZE**
+
+#### 1. Aggregate the data so it's useful and accessible.
+```{r}
+summary(bike_data_new)
+```
+#### 2. Perform calculations
+We find the mean, median, maximum and minimum of ride_length for each user category( member and casual) and also for each day_of_week. The pivot tables help to quickly calculate and visualize data.
+```{r}
+result_summary <- bike_data_new %>%
+  group_by(users)%>%
+  summarize(mean_ride_length=mean(ride_length), median_ride_length=median(ride_length), max_ride_length=max(ride_length), min_ride_length=min(ride_length))
+str(result_summary)
+head(result_summary)
+```
+```{r}
+result_summary_1 <- bike_data_new %>%
+  group_by(day_of_week)%>%
+  summarize(mean_ride_length=mean(ride_length), median_ride_length=median(ride_length), max_ride_length=max(ride_length), min_ride_length=min(ride_length))
+str(result_summary_1)
+head(result_summary_1)
+```
+Determine the count of rides for each user category and for each day_of_week:
+```{r}
+rides_per_user <- bike_data_new %>%
+  group_by(users)%>%
+  summarize(number_of_rides=n())
+head(rides_per_user)
+```
+```{r}
+rides_per_day <- bike_data_new %>%
+  group_by(users,day_of_week)%>%
+  summarize(number_of_rides=n())
+head(rides_per_day)
+```
+
+### **SHARE**
+
+#### **Data Visualizations**
+
+#### Plot 1
+Relationship between average ride_length and users:
+```{r}
+library(ggplot2)
+ggplot(result_summary, aes(x=users, y=mean_ride_length))+
+  geom_bar(stat = "identity", fill="blue", color="black")+
+  labs(title= "Mean ride length by users", x="users", y="Mean ride length")
+```
+
+#### Plot 2
+Correlation between the average ride length and each day of the week:
+```{r}
+ggplot(result_summary_1, aes(x=day_of_week, y=mean_ride_length))+
+  geom_line(color="blue")+
+  geom_point(color="blue", size=3)+
+  labs(title="Average ride length per day",x="day_of_week", y="Mean ride length")
+```
+
+#### Plot 3
+Relationship between number_of_rides and users:
+```{r}
+ggplot(rides_per_user, aes(x=users, y=number_of_rides))+
+  geom_bar(stat="identity", fill="yellow", color="black")+
+  labs(title="Number of rides per user category", x="users", y="Number of rides")
+```
+
+#### Plot 4
+Analyzing the relationship between the number of rides and each day of the week:
+```{r}
+ggplot(rides_per_day, aes(x=day_of_week, y=number_of_rides, fill=users))+
+  geom_bar(stat="identity", position="dodge")+
+  labs(title="Number of rides per day for each user", x="Day of Week", y="Number of rides")+
+  scale_fill_manual(values= c("member"="blue", "casual"="yellow"))+
+  theme_minimal()
+```
+
+#### **Key Findings**
+1. The mean ride length for casual riders is higher than that of members.
+2. The average ride length gradually increases from day 1 to 7, with a notable spike    from day 5 to day 7.
+3. Casual riders contribute significantly fewer rides (around 48,000) compared to      members (approximately 370,000).
+4. The number of rides taken by casual riders remains consistent from day 1 to 5,      with a noticeable increase on day 6 and 7, peaking at 14,886 on day 7.
+5. For members, the number of rides from day 1 to 5 exceeds that of day 6 and 7,       averaging around 62,000. However, on day 6 and 7, the number of rides decreases     to an average of 30,000, distinguishing these days from the rest of the week.
+
+### **ACT**
+#### <span style="color:blue">**CONCLUSIONS**</span>
+
+* **Ride Length Disparity**:
+The data indicates a noteworthy difference in ride length between casual riders and members, with casual riders consistently having longer rides on average. This suggests diverse preferences and usage behaviours between the two user groups.
+* **Weekday Ride Trends**:
+Analysis of the line chart illustrates a gradual increase in average ride length throughout the week. Notably, from day 5 to day 7 (Thursday to Saturday), there is a sharp spike, indicating an upsurge in ride durations. This trend could be attributed to increased leisure or recreational rides during the weekend.
+* **Ride Frequency Discrepancy**:
+Casual riders contribute significantly fewer rides compared to members, with around 48,000 rides for casuals and a substantial 370,000 rides for members. This highlights the need to explore factors influencing casual riders' decisions to purchase memberships and engage more frequently.
+* **Weekend Ride Surge**:
+The bar diagram reveals a remarkable increase in the number of rides taken by casual riders on days 6 and 7 (Friday and Saturday). Day 7 stands out with the highest count of 14,886 rides, indicating a peak in casual rider engagement during the weekend.
+* **Member vs. Casual Weekly Patterns**:
+Weekly patterns for casual riders show consistent ride counts from day 1 to day 5, followed by a surge on days 6 and 7. In contrast, members exhibit higher ride counts from day 1 to 5, with a notable decline on days 6 and 7. Understanding these patterns can inform targeted marketing strategies.
+
+
+#### <span style="color:red">**RECOMMENDATIONS**</span>
+
+
+* **Weekend Membership Promotions:**
+Launch targeted promotions for annual memberships during the weekends, specifically on Fridays and Saturdays. Provide exclusive discounts or perks to incentivize casual riders to make the transition to annual memberships during their peak engagement periods.
+* **Tailored Marketing for Ride Duration:**
+Develop marketing campaigns highlighting the benefits of annual memberships for longer rides. Emphasize cost-effectiveness and additional advantages for riders seeking extended, leisurely experiences. This tailored approach can attract casual riders who favour longer ride durations.
+* **Digital Media Outreach:**
+Implement a strategic digital media strategy to communicate membership benefits effectively. Utilize social media, email campaigns, and targeted digital advertising to convey the convenience, cost savings, and exclusive perks associated with annual memberships. This approach aims to reach both casual and potential member riders through online channels.
+
